@@ -1,5 +1,6 @@
 use crate::chess::game::Game;
 use crate::chess::moves::Move;
+use crate::engine::eval::PhasedEval;
 use crate::engine::options::EngineOptions;
 use crate::engine::search::move_picker::MovePicker;
 use crate::engine::search::principal_variation::PrincipalVariation;
@@ -7,6 +8,7 @@ use crate::engine::search::tables::{CountermoveTable, HistoryTable, KillersTable
 use crate::engine::search::time_control::TimeStrategy;
 use crate::engine::search::transposition::SearchTranspositionTable;
 use crate::engine::tablebases::Tablebase;
+use crate::engine::transposition_table::TranspositionTable;
 use std::time::Duration;
 
 mod aspiration;
@@ -55,6 +57,7 @@ mod params {
 
 pub struct PersistentState {
     pub tt: SearchTranspositionTable,
+    pub pawn_tt: TranspositionTable<PhasedEval>,
     pub history_table: HistoryTable,
     pub tablebase: Tablebase,
 }
@@ -63,6 +66,7 @@ impl PersistentState {
     pub fn new(tt_size_mb: usize) -> Self {
         Self {
             tt: SearchTranspositionTable::new(tt_size_mb),
+            pawn_tt: TranspositionTable::<PhasedEval>::new(16),
             history_table: HistoryTable::new(),
             tablebase: Tablebase::new(),
         }
@@ -76,6 +80,7 @@ impl PersistentState {
 
 pub struct SearchContext<'s> {
     pub tt: &'s mut SearchTranspositionTable,
+    pub pawn_tt: &'s mut TranspositionTable<PhasedEval>,
     pub tablebase: &'s mut Tablebase,
 
     pub history_table: &'s mut HistoryTable,
@@ -103,6 +108,7 @@ impl<'s> SearchContext<'s> {
     ) -> Self {
         Self {
             tt: &mut persistent_state.tt,
+            pawn_tt: &mut persistent_state.pawn_tt,
             tablebase: &mut persistent_state.tablebase,
 
             history_table: &mut persistent_state.history_table,

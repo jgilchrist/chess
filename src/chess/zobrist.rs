@@ -177,6 +177,28 @@ pub fn hash(game: &Game) -> ZobristHash {
     ZobristHash(hash)
 }
 
+pub fn hash_pawns(game: &Game) -> ZobristHash {
+    debug_assert!(
+        unsafe { components::SIDE_TO_PLAY != 0 },
+        "Zobrist components were not initialised"
+    );
+
+    let mut hash = 0u64;
+
+    // Add piece components to hash
+    // White
+    for s in game.board.pawns(Player::White) {
+        hash ^= piece_on_square(Player::White, PieceKind::Pawn, s);
+    }
+
+    // Black
+    for s in game.board.pawns(Player::Black) {
+        hash ^= piece_on_square(Player::Black, PieceKind::Pawn, s);
+    }
+
+    ZobristHash(hash)
+}
+
 fn piece_on_square(player: Player, piece: PieceKind, square: Square) -> ZobristComponent {
     *unsafe {
         components::PIECE_SQUARE

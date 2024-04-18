@@ -8,10 +8,18 @@ use crate::chess::square::{Rank, Square};
 use crate::engine::eval::params::{PieceSquareTableDefinition, DOUBLED_PAWN};
 use crate::engine::eval::piece_square_tables::{flatten, flip, negate, PieceSquareTable};
 use crate::engine::eval::{params, PhasedEval};
+use crate::engine::transposition_table::TranspositionTable;
 
-pub fn eval(game: &Game) -> PhasedEval {
+pub fn eval(game: &Game, pawn_tt: &mut TranspositionTable<PhasedEval>) -> PhasedEval {
+    // We may have seen this pawn structure before, in which case we don't need to re-compute
+    // the evaluation terms that depend on it.
+    if let Some(e) = pawn_tt.get(&game.pawn_zobrist) {
+        return *e;
+    }
+
     let eval = eval_passed_pawns(game) + evaluate_doubled_pawns(game);
 
+    pawn_tt.insert(&game.pawn_zobrist, eval);
     eval
 }
 

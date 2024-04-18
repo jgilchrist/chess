@@ -135,7 +135,7 @@ pub fn negamax(
         }
     }
 
-    let eval = eval::eval(game);
+    let eval = eval::eval(game, ctx.pawn_tt);
 
     if !is_root && !is_pv && !in_check {
         // Reverse futility pruning

@@ -411,7 +411,9 @@ impl Uci {
                 }
                 #[rustfmt::skip]
                 DebugCommand::Eval => {
-                    let eval_components = eval::eval_components(&self.game);
+                    let mut persistent_state_handle = self.persistent_state.lock().unwrap();
+                    let eval_components =
+                        eval::eval_components(&self.game, &mut persistent_state_handle.pawn_tt);
 
                     println!("Phase value: {}", eval_components.phase_value);
                     println!();
@@ -443,6 +445,7 @@ impl Uci {
                 let persistent_state = self.persistent_state.clone();
                 let mut persistent_state_handle = persistent_state.lock().unwrap();
                 persistent_state_handle.tt.resize(16);
+                persistent_state_handle.pawn_tt.resize(16);
 
                 let game = Game::new();
                 let (mut time_strategy, _) =

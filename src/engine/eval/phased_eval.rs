@@ -2,6 +2,7 @@ use crate::chess::board::Board;
 use crate::chess::piece::PieceKind;
 use crate::chess::square::Square;
 use crate::engine::eval::WhiteEval;
+use crate::engine::transposition_table::TTOverwriteable;
 
 const PHASE_COUNT_MAX: i64 = 24;
 
@@ -46,6 +47,12 @@ impl PhasedEval {
 impl std::fmt::Debug for PhasedEval {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "PhasedEval({}, {})", self.midgame().0, self.endgame().0)
+    }
+}
+
+impl TTOverwriteable for PhasedEval {
+    fn should_overwrite_with(&self, _: &Self) -> bool {
+        true
     }
 }
 

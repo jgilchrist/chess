@@ -16,7 +16,7 @@ pub fn quiescence(
     ctx.nodes_visited += 1;
 
     if plies == MAX_SEARCH_DEPTH {
-        return Ok(eval::eval(game));
+        return Ok(eval::eval(game, ctx.pawn_tt));
     }
 
     if game.is_repeated_position()
@@ -32,7 +32,7 @@ pub fn quiescence(
         return Err(());
     }
 
-    let eval = eval::eval(game);
+    let eval = eval::eval(game, ctx.pawn_tt);
 
     if eval >= beta {
         return Ok(eval);
