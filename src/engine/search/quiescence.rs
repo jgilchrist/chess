@@ -38,7 +38,7 @@ pub fn quiescence(
     let eval = eval::eval(game);
 
     if eval >= beta {
-        return Ok(beta);
+        return Ok(eval);
     }
 
     if eval > alpha {
