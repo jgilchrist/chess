@@ -14,31 +14,31 @@ pub fn quiescence(
     time_control: &mut TimeStrategy,
     persistent_state: &mut PersistentState,
     state: &mut SearchState,
-) -> Result<Eval, ()> {
+) -> Eval {
     state.max_depth_reached = state.max_depth_reached.max(plies);
     state.nodes_visited += 1;
 
     if plies == MAX_SEARCH_DEPTH {
-        return Ok(eval::eval(game));
+        return eval::eval(game);
     }
 
     if game.is_repeated_position()
         || game.is_stalemate_by_fifty_move_rule()
         || game.is_stalemate_by_insufficient_material()
     {
-        return Ok(Eval::DRAW);
+        return Eval::DRAW;
     }
 
     // Check periodically to see if we're out of time. If we are, we shouldn't continue the search
     // so we return Err to signal to the caller that the search did not complete.
     if time_control.should_stop(state.nodes_visited) {
-        return Err(());
+        return Eval::MIN;
     }
 
     let eval = eval::eval(game);
 
     if eval >= beta {
-        return Ok(eval);
+        return eval;
     }
 
     if eval > alpha {
@@ -59,7 +59,7 @@ pub fn quiescence(
             time_control,
             persistent_state,
             state,
-        )?;
+        );
 
         game.undo_move();
 
@@ -77,5 +77,5 @@ pub fn quiescence(
         }
     }
 
-    Ok(best_eval)
+    best_eval
 }

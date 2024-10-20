@@ -32,7 +32,7 @@ pub fn search(
             break;
         }
 
-        let Ok(eval) = aspiration_search(
+        let eval = aspiration_search(
             game,
             depth,
             overall_eval,
@@ -40,9 +40,7 @@ pub fn search(
             pv,
             state,
             time_control,
-        ) else {
-            break;
-        };
+        );
 
         let score = if let Some(nmoves) = eval.is_mate_in_moves() {
             SearchScore::Mate(nmoves)

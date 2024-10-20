@@ -20,14 +20,14 @@ pub fn negamax(
     pv: &mut PrincipalVariation,
     time_control: &mut TimeStrategy,
     state: &mut SearchState,
-) -> Result<Eval, ()> {
+) -> Eval {
     let is_root = plies == 0;
     let is_pv = alpha != beta - Eval(1);
 
     // Check periodically to see if we're out of time. If we are, we shouldn't continue the search
     // so we return Err to signal to the caller that the search did not complete.
     if time_control.should_stop(state.nodes_visited) {
-        return Err(());
+        return Eval::MIN;
     }
 
     state.max_depth_reached = state.max_depth_reached.max(plies);
@@ -37,7 +37,7 @@ pub fn negamax(
             || game.is_stalemate_by_fifty_move_rule()
             || game.is_stalemate_by_insufficient_material())
     {
-        return Ok(Eval::DRAW);
+        return Eval::DRAW;
     }
 
     // Check extension: If we're about to finish searching, but we are in check, we
@@ -70,9 +70,9 @@ pub fn negamax(
             let tt_score = tt_entry.eval.with_mate_distance_from_root(plies);
 
             match tt_entry.bound {
-                NodeBound::Exact => return Ok(tt_score),
-                NodeBound::Upper if tt_entry.eval <= alpha => return Ok(tt_score),
-                NodeBound::Lower if tt_entry.eval >= beta => return Ok(tt_score),
+                NodeBound::Exact => return tt_score,
+                NodeBound::Upper if tt_entry.eval <= alpha => return tt_score,
+                NodeBound::Lower if tt_entry.eval >= beta => return tt_score,
                 _ => {}
             }
         }
@@ -87,7 +87,7 @@ pub fn negamax(
         if depth <= params::REVERSE_FUTILITY_PRUNE_DEPTH
             && eval - params::REVERSE_FUTILITY_PRUNE_MARGIN_PER_PLY * i16::from(depth) > beta
         {
-            return Ok(beta);
+            return beta;
         }
 
         // Null move pruning
@@ -108,12 +108,12 @@ pub fn negamax(
                 &mut PrincipalVariation::new(),
                 time_control,
                 state,
-            )?;
+            );
 
             game.undo_null_move();
 
             if null_score >= beta {
-                return Ok(null_score);
+                return null_score;
             }
         }
     }
@@ -154,7 +154,7 @@ pub fn negamax(
                 &mut node_pv,
                 time_control,
                 state,
-            )?
+            )
         } else {
             let reduction = if depth >= params::LMR_DEPTH
                 && number_of_legal_moves >= params::LMR_MOVE_THRESHOLD
@@ -178,7 +178,7 @@ pub fn negamax(
                 &mut node_pv,
                 time_control,
                 state,
-            )?;
+            );
 
             // Turns out the move we just searched could be better than our current PV, so we re-search
             // with the normal alpha/beta bounds.
@@ -193,7 +193,7 @@ pub fn negamax(
                     &mut node_pv,
                     time_control,
                     state,
-                )?
+                )
             } else {
                 pvs_score
             }
@@ -220,11 +220,11 @@ pub fn negamax(
     }
 
     if number_of_legal_moves == 0 {
-        return Ok(if game.is_king_in_check() {
+        return if game.is_king_in_check() {
             Eval::mated_in(plies)
         } else {
             Eval::DRAW
-        });
+        };
     }
 
     if tt_node_bound == NodeBound::Lower {
@@ -252,5 +252,5 @@ pub fn negamax(
 
     persistent_state.tt.insert(&game.zobrist, tt_data);
 
-    Ok(best_eval)
+    best_eval
 }
