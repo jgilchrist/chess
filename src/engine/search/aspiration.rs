@@ -81,6 +81,10 @@ pub fn aspiration_search(
             state,
         );
 
+        if eval == Eval::ABORTED {
+            return eval;
+        }
+
         if eval <= window.alpha {
             window.widen_down();
         } else if eval >= window.beta {

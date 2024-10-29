@@ -32,7 +32,7 @@ pub fn quiescence(
     // Check periodically to see if we're out of time. If we are, we shouldn't continue the search
     // so we return Err to signal to the caller that the search did not complete.
     if time_control.should_stop(state.nodes_visited) {
-        return Eval::MIN;
+        return Eval::ABORTED;
     }
 
     let eval = eval::eval(game);
@@ -74,6 +74,10 @@ pub fn quiescence(
 
         if move_score > alpha {
             alpha = move_score;
+        }
+
+        if move_score == Eval::ABORTED {
+            return move_score;
         }
     }
 

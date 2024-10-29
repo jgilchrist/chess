@@ -42,6 +42,10 @@ pub fn search(
             time_control,
         );
 
+        if eval == Eval::ABORTED {
+            break;
+        }
+
         let score = if let Some(nmoves) = eval.is_mate_in_moves() {
             SearchScore::Mate(nmoves)
         } else {

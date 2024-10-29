@@ -27,7 +27,7 @@ pub fn negamax(
     // Check periodically to see if we're out of time. If we are, we shouldn't continue the search
     // so we return Err to signal to the caller that the search did not complete.
     if time_control.should_stop(state.nodes_visited) {
-        return Eval::MIN;
+        return Eval::ABORTED;
     }
 
     state.max_depth_reached = state.max_depth_reached.max(plies);
@@ -216,6 +216,10 @@ pub fn negamax(
             alpha = move_score;
             tt_node_bound = NodeBound::Exact;
             pv.push(mv, &node_pv);
+        }
+
+        if move_score == Eval::ABORTED {
+            return move_score;
         }
     }
 
