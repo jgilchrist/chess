@@ -112,6 +112,10 @@ pub fn negamax(
 
             game.undo_null_move();
 
+            if null_score == Eval::ABORTED {
+                return Eval::ABORTED;
+            }
+
             if null_score >= beta {
                 return null_score;
             }
@@ -219,7 +223,7 @@ pub fn negamax(
         }
 
         if move_score == Eval::ABORTED {
-            return move_score;
+            return Eval::ABORTED;
         }
     }
 

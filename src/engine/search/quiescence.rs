@@ -63,6 +63,10 @@ pub fn quiescence(
 
         game.undo_move();
 
+        if move_score == Eval::ABORTED {
+            return Eval::ABORTED;
+        }
+
         if move_score > best_eval {
             best_eval = move_score;
         }
@@ -74,10 +78,6 @@ pub fn quiescence(
 
         if move_score > alpha {
             alpha = move_score;
-        }
-
-        if move_score == Eval::ABORTED {
-            return move_score;
         }
     }
 

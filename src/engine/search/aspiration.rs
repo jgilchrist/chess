@@ -82,7 +82,7 @@ pub fn aspiration_search(
         );
 
         if eval == Eval::ABORTED {
-            return eval;
+            return Eval::ABORTED;
         }
 
         if eval <= window.alpha {
