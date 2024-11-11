@@ -71,7 +71,9 @@ impl HistoryTable {
     pub fn add_bonus_for(&mut self, player: Player, mv: Move, depth: u8) {
         let bonus = Self::bonus(depth);
         let existing_score = self.get(player, mv);
-        let new_score = std::cmp::min(existing_score + bonus, move_ordering::HISTORY_MAX_SCORE);
+
+        let new_score = existing_score + bonus
+            - (existing_score * i32::abs(bonus) / move_ordering::HISTORY_MAX_SCORE);
 
         self.0[player.array_idx()][mv.src().array_idx()][mv.dst().array_idx()] = new_score;
     }
