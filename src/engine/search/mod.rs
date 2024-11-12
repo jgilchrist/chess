@@ -42,6 +42,9 @@ mod params {
     pub const REVERSE_FUTILITY_PRUNE_DEPTH: u8 = 4;
     pub const REVERSE_FUTILITY_PRUNE_MARGIN_PER_PLY: Eval = Eval::new(150);
 
+    pub const LMP_DEPTH: u8 = 5;
+    pub const LMP_MOVE_THRESHOLD: usize = 5;
+
     pub const LMR_DEPTH: u8 = 3;
     pub const LMR_MOVE_THRESHOLD: usize = 3;
 

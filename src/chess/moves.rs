@@ -188,6 +188,11 @@ impl Move {
     }
 
     #[inline]
+    pub fn is_quiet(&self) -> bool {
+        self.flags() == Flags::Quiet
+    }
+
+    #[inline]
     pub fn is_capture(self) -> bool {
         (self.data() & CAPTURE_BIT_MASK) == CAPTURE_BIT_MASK
     }

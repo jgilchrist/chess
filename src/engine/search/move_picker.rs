@@ -124,20 +124,24 @@ impl MovePicker {
         if self.stage == GenQuiets {
             self.stage = Killer1;
 
-            movegen::generate_quiets(game, &mut self.moves, &self.movegencache);
+            if !self.only_captures {
+                movegen::generate_quiets(game, &mut self.moves, &self.movegencache);
+            }
         }
 
         if self.stage == Killer1 {
             self.stage = Killer2;
 
-            if let Some(killer1) = ctx.killer_moves.get_0(plies) {
-                for i in self.first_quiet..self.moves.len() {
-                    if self.moves.get(i).is_some_and(|m| *m == killer1) {
-                        self.moves.swap(self.first_quiet, i);
-                        self.first_quiet += 1;
+            if !self.only_captures {
+                if let Some(killer1) = ctx.killer_moves.get_0(plies) {
+                    for i in self.first_quiet..self.moves.len() {
+                        if self.moves.get(i).is_some_and(|m| *m == killer1) {
+                            self.moves.swap(self.first_quiet, i);
+                            self.first_quiet += 1;
 
-                        if Some(killer1) != self.previous_best_move {
-                            return Some(killer1);
+                            if Some(killer1) != self.previous_best_move {
+                                return Some(killer1);
+                            }
                         }
                     }
                 }
@@ -147,14 +151,16 @@ impl MovePicker {
         if self.stage == Killer2 {
             self.stage = CounterMove;
 
-            if let Some(killer2) = ctx.killer_moves.get_1(plies) {
-                for i in self.first_quiet..self.moves.len() {
-                    if self.moves.get(i).is_some_and(|m| *m == killer2) {
-                        self.moves.swap(self.first_quiet, i);
-                        self.first_quiet += 1;
+            if !self.only_captures {
+                if let Some(killer2) = ctx.killer_moves.get_1(plies) {
+                    for i in self.first_quiet..self.moves.len() {
+                        if self.moves.get(i).is_some_and(|m| *m == killer2) {
+                            self.moves.swap(self.first_quiet, i);
+                            self.first_quiet += 1;
 
-                        if Some(killer2) != self.previous_best_move {
-                            return Some(killer2);
+                            if Some(killer2) != self.previous_best_move {
+                                return Some(killer2);
+                            }
                         }
                     }
                 }
@@ -173,15 +179,19 @@ impl MovePicker {
                 }
             }
 
-            if let Some(previous_move) = game.history.last().and_then(|h| h.mv) {
-                if let Some(counter_move) = ctx.countermove_table.get(game.player, previous_move) {
-                    for i in self.first_quiet..self.moves.len() {
-                        if self.moves.get(i).is_some_and(|m| *m == counter_move) {
-                            self.moves.swap(self.first_quiet, i);
-                            self.first_quiet += 1;
+            if !self.only_captures {
+                if let Some(previous_move) = game.history.last().and_then(|h| h.mv) {
+                    if let Some(counter_move) =
+                        ctx.countermove_table.get(game.player, previous_move)
+                    {
+                        for i in self.first_quiet..self.moves.len() {
+                            if self.moves.get(i).is_some_and(|m| *m == counter_move) {
+                                self.moves.swap(self.first_quiet, i);
+                                self.first_quiet += 1;
 
-                            if Some(counter_move) != self.previous_best_move {
-                                return Some(counter_move);
+                                if Some(counter_move) != self.previous_best_move {
+                                    return Some(counter_move);
+                                }
                             }
                         }
                     }
@@ -211,8 +221,10 @@ impl MovePicker {
         }
 
         if self.stage == Quiets {
-            if let Some((mv, _)) = self.next_best_move(self.moves.len()) {
-                return Some(mv);
+            if !self.only_captures {
+                if let Some((mv, _)) = self.next_best_move(self.moves.len()) {
+                    return Some(mv);
+                }
             }
 
             self.stage = Done;
@@ -261,6 +273,10 @@ impl MovePicker {
 
             return Some((best_move, best_move_score));
         }
+    }
+
+    pub fn yield_only_captures(&mut self) {
+        self.only_captures = true;
     }
 }
 

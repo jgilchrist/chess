@@ -176,7 +176,7 @@ pub fn negamax(
     let mut best_eval = Eval::MIN;
 
     let mut moves = MovePicker::new(previous_best_move);
-    let mut number_of_legal_moves = 0;
+    let mut number_of_legal_moves: usize = 0;
     let mut node_pv = PrincipalVariation::new();
 
     while let Some(mv) = moves.next(game, ctx, plies) {
@@ -191,6 +191,18 @@ pub fn negamax(
             && eval + params::FUTILITY_PRUNE_MAX_MOVE_VALUE < alpha
         {
             continue;
+        }
+
+        let lmp_moves: usize = params::LMP_MOVE_THRESHOLD + 2 + (depth as usize * depth as usize);
+
+        if depth <= params::LMP_DEPTH
+            && mv.is_quiet()
+            && !is_root
+            && !is_pv
+            && !in_check
+            && number_of_legal_moves >= lmp_moves
+        {
+            moves.yield_only_captures();
         }
 
         game.make_move(mv);
