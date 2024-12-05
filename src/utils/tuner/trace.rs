@@ -4,6 +4,7 @@ use crate::chess::game::Game;
 use crate::chess::movegen::tables;
 use crate::chess::piece::PieceKind;
 use crate::chess::player::Player;
+use crate::chess::square;
 use crate::chess::square::Square;
 use crate::engine::eval;
 use crate::utils::tuner::NonZeroCoefficient;
@@ -43,6 +44,7 @@ pub struct Trace {
     attacked_king_squares: [TraceComponent; 9],
 
     bishop_pair: TraceComponent,
+    doubled_pawn: TraceComponent,
 }
 
 impl Trace {
@@ -55,6 +57,7 @@ impl Trace {
 
         let occupancy = board.occupancy();
 
+        let our_pawns = board.pawns(player);
         let their_pawns = board.pawns(player.other());
 
         for sq in board.pawns(player) {
@@ -64,6 +67,14 @@ impl Trace {
             // Evaluate passer masks from white's perspective
             if eval::pawn_structure::is_passed(sq, Player::White, their_pawns) {
                 trace.passed_pawn_pst[sq.array_idx()].incr(player);
+            }
+        }
+
+        for file in square::FILES {
+            let bb = file.bitboard();
+
+            if (our_pawns & bb).count() > 1 {
+                trace.doubled_pawn.incr(player);
             }
         }
 
@@ -149,6 +160,7 @@ impl Trace {
             attacked_king_squares: [TraceComponent::default(); 9],
 
             bishop_pair: TraceComponent::default(),
+            doubled_pawn: TraceComponent::default(),
         };
 
         Self::trace_for_player(&mut trace, &game.board, Player::White);
@@ -173,6 +185,7 @@ impl Trace {
             .add(&self.queen_mobility)
             .add(&self.attacked_king_squares)
             .add(&[self.bishop_pair])
+            .add(&[self.doubled_pawn])
             .get()
     }
 }

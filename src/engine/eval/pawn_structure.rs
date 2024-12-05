@@ -3,13 +3,14 @@ use crate::chess::game::Game;
 use crate::chess::bitboard::{bitboards, Bitboard};
 use crate::chess::board::Board;
 use crate::chess::player::{ByPlayer, Player};
+use crate::chess::square;
 use crate::chess::square::{Rank, Square};
-use crate::engine::eval::params::PieceSquareTableDefinition;
+use crate::engine::eval::params::{PieceSquareTableDefinition, DOUBLED_PAWN};
 use crate::engine::eval::piece_square_tables::{flatten, flip, negate, PieceSquareTable};
 use crate::engine::eval::{params, PhasedEval};
 
 pub fn eval(game: &Game) -> PhasedEval {
-    let eval = eval_passed_pawns(game);
+    let eval = eval_passed_pawns(game) + evaluate_doubled_pawns(game);
 
     eval
 }
@@ -113,6 +114,27 @@ fn calculate_passed_pawn_bonus(board: &Board, player: Player) -> PhasedEval {
     }
 
     bonus
+}
+
+fn evaluate_doubled_pawns(game: &Game) -> PhasedEval {
+    let mut eval = PhasedEval::ZERO;
+
+    let white_pawns = game.board.pawns(Player::White);
+    let black_pawns = game.board.pawns(Player::Black);
+
+    for file in square::FILES {
+        let bb = file.bitboard();
+
+        if (white_pawns & bb).count() > 1 {
+            eval += DOUBLED_PAWN;
+        }
+
+        if (black_pawns & bb).count() > 1 {
+            eval -= DOUBLED_PAWN;
+        }
+    }
+
+    eval
 }
 
 pub fn init() {
