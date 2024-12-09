@@ -1,9 +1,10 @@
+use super::{SearchContext, MAX_SEARCH_DEPTH};
 use crate::chess::game::Game;
+use crate::chess::moves::Move;
 use crate::engine::eval;
 use crate::engine::eval::Eval;
 use crate::engine::search::move_picker::MovePicker;
-
-use super::{SearchContext, MAX_SEARCH_DEPTH};
+use crate::engine::search::transposition::{NodeBound, SearchTranspositionTableData};
 
 pub fn quiescence(
     game: &mut Game,
@@ -32,6 +33,21 @@ pub fn quiescence(
         return Err(());
     }
 
+    let mut previous_best_move: Option<Move> = None;
+
+    if let Some(tt_entry) = ctx.tt.get(&game.zobrist) {
+        let tt_score = tt_entry.eval.with_mate_distance_from_root(plies);
+
+        match tt_entry.bound {
+            NodeBound::Exact => return Ok(tt_score),
+            NodeBound::Upper if tt_entry.eval <= alpha => return Ok(tt_score),
+            NodeBound::Lower if tt_entry.eval >= beta => return Ok(tt_score),
+            _ => {}
+        }
+
+        previous_best_move = tt_entry.best_move;
+    }
+
     let eval = eval::eval(game);
 
     if eval >= beta {
@@ -43,8 +59,10 @@ pub fn quiescence(
     }
 
     let mut best_eval = eval;
+    let mut tt_node_bound = NodeBound::Upper;
+    let mut best_move = None;
 
-    let mut moves = MovePicker::new_loud();
+    let mut moves = MovePicker::new_loud(previous_best_move);
     while let Some(mv) = moves.next(game, ctx, plies) {
         game.make_move(mv);
 
@@ -58,13 +76,26 @@ pub fn quiescence(
 
         // Cutoff: This move is so good that our opponent won't let it be played.
         if move_score >= beta {
+            tt_node_bound = NodeBound::Lower;
             break;
         }
 
         if move_score > alpha {
+            tt_node_bound = NodeBound::Exact;
             alpha = move_score;
+            best_move = Some(mv);
         }
     }
+
+    let tt_data = SearchTranspositionTableData {
+        bound: tt_node_bound,
+        eval: best_eval.with_mate_distance_from_position(plies),
+        best_move,
+        age: ctx.tt.generation,
+        depth: plies,
+    };
+
+    ctx.tt.insert(&game.zobrist, tt_data);
 
     Ok(best_eval)
 }
