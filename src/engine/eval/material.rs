@@ -1,8 +1,9 @@
 use crate::chess::board::Board;
 use crate::chess::game::Game;
+use crate::chess::movegen::tables;
 use crate::chess::piece::PieceKind;
 use crate::chess::player::Player;
-use crate::engine::eval::params::BISHOP_PAIR_BONUS;
+use crate::engine::eval::params::{BISHOP_PAIR_BONUS, CONNECTED_ROOK_BONUS};
 use crate::engine::eval::trace::Trace;
 use crate::engine::eval::PhasedEval;
 
@@ -65,6 +66,48 @@ pub fn bishop_pair_eval<const TRACE: bool>(game: &Game, trace: &mut Trace) -> Ph
     bishop_pair_bonuses
 }
 
+pub fn connected_rooks<const TRACE: bool>(game: &Game, trace: &mut Trace) -> PhasedEval {
+    let mut connected_rook_bonus = PhasedEval::ZERO;
+
+    let blockers = game.board.occupancy();
+
+    let white_rooks = game.board.rooks(Player::White);
+    let white_candidate_rook = white_rooks.lsb();
+
+    if !white_candidate_rook.is_empty() {
+        let white_rook = white_candidate_rook.single();
+
+        let attacked_squares = tables::rook_attacks(white_rook, blockers);
+
+        if (attacked_squares & white_rooks).any() {
+            connected_rook_bonus += CONNECTED_ROOK_BONUS;
+
+            if TRACE {
+                trace.connected_rooks.incr(Player::White);
+            }
+        }
+    }
+
+    let black_rooks = game.board.rooks(Player::Black);
+    let black_candidate_rook = black_rooks.lsb();
+
+    if !black_candidate_rook.is_empty() {
+        let black_rook = black_candidate_rook.single();
+
+        let attacked_squares = tables::rook_attacks(black_rook, blockers);
+
+        if (attacked_squares & black_rooks).any() {
+            connected_rook_bonus += CONNECTED_ROOK_BONUS;
+
+            if TRACE {
+                trace.connected_rooks.incr(Player::Black);
+            }
+        }
+    }
+
+    connected_rook_bonus
+}
+
 pub fn eval<const TRACE: bool>(game: &Game, trace: &mut Trace) -> PhasedEval {
-    bishop_pair_eval::<TRACE>(game, trace)
+    bishop_pair_eval::<TRACE>(game, trace) + connected_rooks::<TRACE>(game, trace)
 }

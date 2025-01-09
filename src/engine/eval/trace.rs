@@ -37,6 +37,7 @@ pub struct Trace {
     pub attacked_king_squares: [TraceComponent; 9],
 
     pub bishop_pair: TraceComponent,
+    pub connected_rooks: TraceComponent,
 }
 
 impl Trace {
@@ -62,6 +63,7 @@ impl Trace {
             attacked_king_squares: [TraceComponent::default(); 9],
 
             bishop_pair: TraceComponent::default(),
+            connected_rooks: TraceComponent::default(),
         }
     }
 
@@ -81,6 +83,7 @@ impl Trace {
             .add(&self.queen_mobility)
             .add(&self.attacked_king_squares)
             .add(&[self.bishop_pair])
+            .add(&[self.connected_rooks])
             .get()
     }
 }

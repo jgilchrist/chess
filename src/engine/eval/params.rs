@@ -186,3 +186,5 @@ pub const ATTACKED_KING_SQUARES: [PhasedEval; 9] = [
 ];
 
 pub const BISHOP_PAIR_BONUS: PhasedEval = s(   31,    89);
+
+pub const CONNECTED_ROOK_BONUS: PhasedEval = s(   -5,    20);
