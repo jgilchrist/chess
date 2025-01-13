@@ -35,6 +35,7 @@ parameters!(
     (queen_mobility, 28, array, "QUEEN_MOBILITY"),
     (attacked_king_squares, 9, array, "ATTACKED_KING_SQUARES"),
     (bishop_pair, 1, single, "BISHOP_PAIR_BONUS"),
+    (doubled_pawns, 1, single, "DOUBLED_PAWN_MALUS"),
 );
 
 pub fn init() {

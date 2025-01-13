@@ -3,13 +3,42 @@ use crate::chess::game::Game;
 use crate::chess::bitboard::{bitboards, Bitboard};
 use crate::chess::board::Board;
 use crate::chess::player::{ByPlayer, Player};
-use crate::chess::square::{Rank, Square};
+use crate::chess::square::{File, Rank, Square};
 use crate::engine::eval::params::PieceSquareTableDefinition;
 use crate::engine::eval::piece_square_tables::{flatten, flip, negate, PieceSquareTable};
 use crate::engine::eval::{params, PhasedEval, Trace, TraceComponentIncr};
 
 pub fn eval<const TRACE: bool>(game: &Game, trace: &mut Trace) -> PhasedEval {
-    let eval = eval_passed_pawns::<TRACE>(game, trace);
+    let eval = eval_passed_pawns::<TRACE>(game, trace) + eval_doubled_pawn::<TRACE>(game, trace);
+
+    eval
+}
+
+pub fn eval_doubled_pawn<const TRACE: bool>(game: &Game, trace: &mut Trace) -> PhasedEval {
+    let mut eval = PhasedEval::ZERO;
+
+    let white_pawns = game.board.pawns(Player::White);
+    let black_pawns = game.board.pawns(Player::Black);
+
+    for file in File::ALL {
+        let bb = file.bitboard();
+
+        if (white_pawns & bb).count() > 1 {
+            eval += params::DOUBLED_PAWN_MALUS;
+
+            if TRACE {
+                trace.doubled_pawns.incr(Player::White);
+            }
+        }
+
+        if (black_pawns & bb).count() > 1 {
+            eval -= params::DOUBLED_PAWN_MALUS;
+
+            if TRACE {
+                trace.doubled_pawns.incr(Player::Black);
+            }
+        }
+    }
 
     eval
 }
