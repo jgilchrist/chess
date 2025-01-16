@@ -22,6 +22,26 @@ enum GenStage {
     Done,
 }
 
+impl GenStage {
+    fn next(&self) -> Option<Self> {
+        use GenStage::*;
+
+        Some(match self {
+            BestMove => GenCaptures,
+            GenCaptures => GoodCaptures,
+            GoodCaptures => GenQuiets,
+            GenQuiets => Killer1,
+            Killer1 => Killer2,
+            Killer2 => CounterMove,
+            CounterMove => BadCaptures,
+            BadCaptures => ScoreQuiets,
+            ScoreQuiets => Quiets,
+            Quiets => Done,
+            Done => return None,
+        })
+    }
+}
+
 pub struct MovePicker {
     moves: MoveList,
     movegencache: MovegenCache,
@@ -34,6 +54,11 @@ pub struct MovePicker {
     captures_end: usize,
     first_bad_capture: Option<usize>,
     first_quiet: usize,
+}
+
+enum IterResult {
+    NextStage(Option<Move>),
+    MoreToCome(Move),
 }
 
 impl MovePicker {
@@ -70,159 +95,186 @@ impl MovePicker {
     }
 
     pub fn next(&mut self, game: &Game, ctx: &SearchContext<'_>, plies: u8) -> Option<Move> {
-        use GenStage::*;
+        loop {
+            let result = self.iter(game, ctx, plies);
 
-        if self.stage == BestMove {
-            self.stage = GenCaptures;
+            match result {
+                IterResult::NextStage(mv) => {
+                    let Some(next_stage) = self.stage.next() else {
+                        return None;
+                    };
 
-            if let Some(previous_best_move) = self.previous_best_move {
-                return Some(previous_best_move);
-            }
-        }
+                    self.stage = next_stage;
 
-        if self.stage == GenCaptures {
-            self.stage = GoodCaptures;
+                    // TODO: Make this nicer
+                    if self.stage == GenStage::BadCaptures {
+                        if let Some(first_bad_capture_idx) = self.first_bad_capture {
+                            self.idx = first_bad_capture_idx;
+                        }
+                    }
 
-            movegen::generate_captures(game, &mut self.moves, &mut self.movegencache);
+                    // TODO: Make this nicer
+                    if self.stage == GenStage::Quiets {
+                        self.idx = self.first_quiet;
+                    }
 
-            self.captures_end = self.moves.len();
-            self.first_quiet = self.moves.len();
-
-            for i in 0..self.moves.len() {
-                self.scores[i] = score_tactical(game, *self.moves.get(i).unwrap());
-            }
-        }
-
-        if self.stage == GoodCaptures {
-            if let Some((mv, score)) = self.next_best_move(self.captures_end) {
-                // If the move we just picked was a losing capture, we're going to skip the rest of the captures.
-                // Record that, and skip the remainder of the captures since we'll be trying quiet moves next.
-                if score < move_ordering::GOOD_CAPTURE_SCORE {
-                    self.first_bad_capture = Some(self.idx - 1);
-                    self.idx = self.captures_end;
-                } else {
+                    match mv {
+                        None => {
+                            continue;
+                        }
+                        Some(mv) => {
+                            return Some(mv);
+                        }
+                    }
+                }
+                IterResult::MoreToCome(mv) => {
                     return Some(mv);
                 }
             }
+        }
+    }
 
-            if self.only_captures {
-                match self.first_bad_capture {
-                    // If we didn't see any bad captures before, we can skip straight to the end
-                    None => self.stage = Done,
+    fn iter(&mut self, game: &Game, ctx: &SearchContext<'_>, plies: u8) -> IterResult {
+        use IterResult::*;
 
-                    // If we saw any bad captures, go back and try those too
-                    Some(first_bad_capture_idx) => {
-                        self.idx = first_bad_capture_idx;
-                        self.stage = BadCaptures;
-                    }
+        match self.stage {
+            GenStage::BestMove => NextStage(self.previous_best_move),
+            GenStage::GenCaptures => {
+                movegen::generate_captures(game, &mut self.moves, &mut self.movegencache);
+
+                self.captures_end = self.moves.len();
+                self.first_quiet = self.moves.len();
+
+                for i in 0..self.moves.len() {
+                    self.scores[i] = score_tactical(game, *self.moves.get(i).unwrap());
                 }
-            } else {
-                self.stage = GenQuiets;
-            };
-        }
 
-        if self.stage == GenQuiets {
-            self.stage = Killer1;
-
-            movegen::generate_quiets(game, &mut self.moves, &self.movegencache);
-        }
-
-        if self.stage == Killer1 {
-            self.stage = Killer2;
-
-            if let Some(killer1) = ctx.killer_moves.get_0(plies) {
-                for i in self.first_quiet..self.moves.len() {
-                    if self.moves.get(i).is_some_and(|m| *m == killer1) {
-                        self.moves.swap(self.first_quiet, i);
-                        self.first_quiet += 1;
-
-                        if Some(killer1) != self.previous_best_move {
-                            return Some(killer1);
-                        }
+                NextStage(None)
+            }
+            GenStage::GoodCaptures => {
+                if let Some((mv, score)) = self.next_best_move(self.captures_end) {
+                    // If the move we just picked was a losing capture, we're going to skip the rest of the captures.
+                    // Record that, and skip the remainder of the captures since we'll be trying quiet moves next.
+                    if score < move_ordering::GOOD_CAPTURE_SCORE {
+                        self.first_bad_capture = Some(self.idx - 1);
+                        // TODO: Move this out
+                        self.idx = self.captures_end;
+                        NextStage(None)
+                    } else {
+                        MoreToCome(mv)
                     }
+                } else {
+                    NextStage(None)
                 }
             }
-        }
-
-        if self.stage == Killer2 {
-            self.stage = CounterMove;
-
-            if let Some(killer2) = ctx.killer_moves.get_1(plies) {
-                for i in self.first_quiet..self.moves.len() {
-                    if self.moves.get(i).is_some_and(|m| *m == killer2) {
-                        self.moves.swap(self.first_quiet, i);
-                        self.first_quiet += 1;
-
-                        if Some(killer2) != self.previous_best_move {
-                            return Some(killer2);
-                        }
-                    }
+            GenStage::GenQuiets => {
+                if self.only_captures {
+                    return NextStage(None);
                 }
+
+                movegen::generate_quiets(game, &mut self.moves, &self.movegencache);
+                NextStage(None)
             }
-        }
-
-        if self.stage == CounterMove {
-            match self.first_bad_capture {
-                // If we didn't see any bad captures before, we can skip straight to the end
-                None => self.stage = ScoreQuiets,
-
-                // If we saw any bad captures, go back and try those too
-                Some(first_bad_capture_idx) => {
-                    self.idx = first_bad_capture_idx;
-                    self.stage = BadCaptures;
+            GenStage::Killer1 => {
+                if self.only_captures {
+                    return NextStage(None);
                 }
-            }
 
-            if let Some(previous_move) = game.history.last().and_then(|h| h.mv) {
-                if let Some(counter_move) = ctx.countermove_table.get(game.player, previous_move) {
+                if let Some(killer1) = ctx.killer_moves.get_0(plies) {
                     for i in self.first_quiet..self.moves.len() {
-                        if self.moves.get(i).is_some_and(|m| *m == counter_move) {
+                        if self.moves.get(i).is_some_and(|m| *m == killer1) {
                             self.moves.swap(self.first_quiet, i);
                             self.first_quiet += 1;
 
-                            if Some(counter_move) != self.previous_best_move {
-                                return Some(counter_move);
+                            if Some(killer1) != self.previous_best_move {
+                                return NextStage(Some(killer1));
                             }
                         }
                     }
                 }
+
+                NextStage(None)
             }
-        }
+            GenStage::Killer2 => {
+                if self.only_captures {
+                    return NextStage(None);
+                }
 
-        if self.stage == BadCaptures {
-            if let Some((mv, _)) = self.next_best_move(self.captures_end) {
-                return Some(mv);
+                if let Some(killer2) = ctx.killer_moves.get_1(plies) {
+                    for i in self.first_quiet..self.moves.len() {
+                        if self.moves.get(i).is_some_and(|m| *m == killer2) {
+                            self.moves.swap(self.first_quiet, i);
+                            self.first_quiet += 1;
+
+                            if Some(killer2) != self.previous_best_move {
+                                return NextStage(Some(killer2));
+                            }
+                        }
+                    }
+                }
+
+                NextStage(None)
             }
+            GenStage::CounterMove => {
+                if self.only_captures {
+                    return NextStage(None);
+                }
 
-            self.stage = if self.only_captures {
-                Done
-            } else {
-                ScoreQuiets
-            };
-        }
+                if let Some(previous_move) = game.history.last().and_then(|h| h.mv) {
+                    if let Some(counter_move) =
+                        ctx.countermove_table.get(game.player, previous_move)
+                    {
+                        for i in self.first_quiet..self.moves.len() {
+                            if self.moves.get(i).is_some_and(|m| *m == counter_move) {
+                                self.moves.swap(self.first_quiet, i);
+                                self.first_quiet += 1;
 
-        if self.stage == ScoreQuiets {
-            self.stage = Quiets;
-            self.idx = self.first_quiet;
+                                if Some(counter_move) != self.previous_best_move {
+                                    return NextStage(Some(counter_move));
+                                }
+                            }
+                        }
+                    }
+                }
 
-            for i in self.idx..self.moves.len() {
-                self.scores[i] = score_quiet(game, *self.moves.get(i).unwrap(), ctx.history_table);
+                NextStage(None)
             }
-        }
+            GenStage::BadCaptures => {
+                if self.first_bad_capture.is_none() {
+                    return NextStage(None);
+                }
 
-        if self.stage == Quiets {
-            if let Some((mv, _)) = self.next_best_move(self.moves.len()) {
-                return Some(mv);
+                if let Some((mv, _)) = self.next_best_move(self.captures_end) {
+                    MoreToCome(mv)
+                } else {
+                    NextStage(None)
+                }
             }
+            GenStage::ScoreQuiets => {
+                if self.only_captures {
+                    return NextStage(None);
+                }
 
-            self.stage = Done;
+                for i in self.idx..self.moves.len() {
+                    self.scores[i] =
+                        score_quiet(game, *self.moves.get(i).unwrap(), ctx.history_table);
+                }
+
+                NextStage(None)
+            }
+            GenStage::Quiets => {
+                if self.only_captures {
+                    return NextStage(None);
+                }
+
+                if let Some((mv, _)) = self.next_best_move(self.moves.len()) {
+                    MoreToCome(mv)
+                } else {
+                    NextStage(None)
+                }
+            }
+            GenStage::Done => NextStage(None),
         }
-
-        if self.stage == Done {
-            return None;
-        }
-
-        unreachable!()
     }
 
     fn next_best_move(&mut self, limit: usize) -> Option<(Move, i32)> {
